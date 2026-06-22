@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>講習 日程希望調査</title>
+<style>
+  :root{
+    --accent:#2e6fb0; --accent-d:#235a90;
+    --ok-bg:#f3faf4; --ok-fg:#2e8b3d;
+    --ng-bg:#e8453c; --ng-fg:#ffffff;
+    --line:#d9dee5; --ink:#26303a; --muted:#6b7884;
+    --sat:#1f6fd6; --sun:#d63a3a;
+    --bg:#eef1f5; --card:#ffffff;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,system-ui,sans-serif;
+    color:var(--ink); background:var(--bg); line-height:1.5;
+    font-size:15px; -webkit-text-size-adjust:100%;
+  }
+  .hidden{display:none !important;}
+
+  /* ===== ログイン画面 ===== */
+  #loginView{
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .login-card{
+    background:var(--card); width:100%; max-width:380px; border-radius:16px;
+    box-shadow:0 6px 24px rgba(0,0,0,.08); padding:28px 24px;
+  }
+  .login-card h1{font-size:20px; margin:0 0 4px; text-align:center;}
+  .login-card .sub{color:var(--muted); font-size:13px; text-align:center; margin-bottom:22px;}
+  .field label{display:block; font-size:13px; color:var(--muted); margin-bottom:6px;}
+  .field input{
+    width:100%; font-size:18px; padding:12px 14px; border:1.5px solid var(--line);
+    border-radius:10px; outline:none; text-align:center; letter-spacing:.05em;
+  }
+  .field input:focus{border-color:var(--accent);}
+  .btn{
+    display:block; width:100%; border:none; border-radius:10px; cursor:pointer;
+    font-size:16px; font-weight:700; padding:13px; margin-top:18px; color:#fff;
+    background:var(--accent);
+  }
+  .btn:active{background:var(--accent-d);}
+  .btn[disabled]{opacity:.55; cursor:default;}
+  .msg{margin-top:14px; font-size:13px; text-align:center; min-height:18px;}
+  .msg.err{color:#d63a3a;}
+
+  /* ===== ヘッダー ===== */
+  #appView{min-height:100vh; display:flex; flex-direction:column;}
+  header.bar{
+    position:sticky; top:0; z-index:30; background:var(--accent); color:#fff;
+    padding:10px 14px; display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
+  }
+  header.bar .title{font-size:16px; font-weight:700; padding-top:3px;}
+  header.bar .who{
+    text-align:right; font-size:12px; line-height:1.35; background:rgba(255,255,255,.14);
+    border-radius:8px; padding:6px 10px; min-width:120px;
+  }
+  header.bar .who .nm{font-size:15px; font-weight:700;}
+  .confirm-note{
+    background:#fff7e6; color:#8a6d00; font-size:12.5px; padding:8px 14px;
+    border-bottom:1px solid #f0e3bd;
+  }
+  .legend{
+    display:flex; gap:16px; align-items:center; padding:9px 14px; font-size:13px;
+    background:#fff; border-bottom:1px solid var(--line); color:var(--muted);
+  }
+  .legend b{color:var(--ink);}
+  .chip{display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px;
+    border-radius:6px; font-weight:700; margin-right:5px; vertical-align:middle;}
+  .chip.ok{background:var(--ok-bg); color:var(--ok-fg); border:1.5px solid #cfe6d3;}
+  .chip.ng{background:var(--ng-bg); color:var(--ng-fg);}
+
+  /* ===== グリッド本体 ===== */
+  main{flex:1; padding:14px 12px 96px;}
+  .block{
+    background:#fff; border:1px solid var(--line); border-radius:12px;
+    margin:0 0 16px; overflow:hidden;
+  }
+  .block-head{
+    font-size:13px; font-weight:700; color:var(--accent-d);
+    padding:9px 12px; background:#f5f8fc; border-bottom:1px solid var(--line);
+  }
+  .scroller{overflow-x:auto; -webkit-overflow-scrolling:touch;}
+  table.grid{border-collapse:separate; border-spacing:0; width:max-content;}
+  table.grid th, table.grid td{
+    border-right:1px solid var(--line); border-bottom:1px solid var(--line);
+    text-align:center; white-space:nowrap;
+  }
+  /* 左上の角・日付ヘッダ行 */
+  table.grid thead th{
+    position:sticky; top:0; z-index:5; background:#fafbfc; font-weight:600;
+    font-size:12px; color:var(--muted); padding:6px 8px; min-width:46px;
+  }
+  table.grid thead th .d{font-size:13px; color:var(--ink); font-weight:700;}
+  table.grid thead th.sat .d{color:var(--sat);} table.grid thead th.sat{color:var(--sat);}
+  table.grid thead th.sun .d{color:var(--sun);} table.grid thead th.sun{color:var(--sun);}
+  /* コマ名（左固定列） */
+  table.grid th.slot, table.grid thead th.corner{
+    position:sticky; left:0; z-index:6; background:#f5f8fc; min-width:70px;
+    text-align:left; padding:6px 10px; font-size:12px; border-right:1.5px solid var(--line);
+  }
+  table.grid thead th.corner{z-index:8;}
+  table.grid th.slot .sn{font-size:14px; font-weight:700; color:var(--ink);}
+  table.grid th.slot .st{font-size:11px; color:var(--muted);}
+  /* セル */
+  td.cell{padding:3px;}
+  .toggle{
+    width:42px; height:40px; border:none; border-radius:8px; cursor:pointer;
+    font-size:20px; font-weight:700; line-height:1; display:flex; align-items:center; justify-content:center;
+    margin:0 auto;
+  }
+  .toggle.ok{background:var(--ok-bg); color:var(--ok-fg);}
+  .toggle.ng{background:var(--ng-bg); color:var(--ng-fg);}
+  .toggle:active{transform:scale(.92);}
+
+  /* ===== 保存バー ===== */
+  .savebar{
+    position:fixed; left:0; right:0; bottom:0; z-index:40; background:#fff;
+    border-top:1px solid var(--line); padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+    display:flex; align-items:center; gap:12px; box-shadow:0 -3px 12px rgba(0,0,0,.05);
+  }
+  .savebar .hint{flex:1; font-size:12px; color:var(--muted);}
+  .savebar button{
+    border:none; border-radius:10px; background:var(--accent); color:#fff;
+    font-size:16px; font-weight:700; padding:12px 26px; cursor:pointer;
+  }
+  .savebar button:active{background:var(--accent-d);}
+  .savebar button[disabled]{opacity:.5;}
+
+  /* トースト */
+  #toast{
+    position:fixed; left:50%; bottom:84px; transform:translateX(-50%) translateY(12px);
+    background:#26303a; color:#fff; padding:10px 18px; border-radius:22px; font-size:14px;
+    opacity:0; transition:.25s; z-index:60; pointer-events:none; max-width:90%;
+  }
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  /* お知らせ（active講習なし等） */
+  .notice{
+    background:#fff; border:1px solid var(--line); border-radius:12px;
+    padding:28px 20px; text-align:center; color:var(--muted); margin-top:18px;
+  }
+  .linklike{color:var(--accent); background:none; border:none; font-size:13px; cursor:pointer; text-decoration:underline; padding:0;}
+</style>
+</head>
+<body>
+
+<!-- ========== ログイン画面 ========== -->
+<section id="loginView">
+  <div class="login-card">
+    <h1 id="loginTitle">日程希望調査</h1>
+    <div class="sub">生徒IDを入力してログインしてください</div>
+    <div class="field">
+      <label for="sid">生徒ID</label>
+      <input id="sid" type="tel" inputmode="numeric" autocomplete="off" placeholder="例）1" />
+    </div>
+    <button class="btn" id="loginBtn">ログイン</button>
+    <div class="msg" id="loginMsg"></div>
+  </div>
+</section>
+
+<!-- ========== アプリ画面 ========== -->
+<section id="appView" class="hidden">
+  <header class="bar">
+    <div class="title" id="termTitle">日程希望調査</div>
+    <div class="who">
+      <div class="nm" id="whoName">—</div>
+      <div id="whoGrade">—</div>
+    </div>
+  </header>
+  <div class="confirm-note">お名前と学年が正しいか確認してください。違っていたら塾長まで。</div>
+  <div class="legend" id="legend">
+    <span><span class="chip ok">○</span><b>来られる</b>（授業OK）</span>
+    <span><span class="chip ng">×</span><b>来られない</b></span>
+  </div>
+
+  <main id="gridArea"></main>
+
+  <div class="savebar" id="saveBar">
+    <div class="hint">来られないコマを <b>×</b> にしてください。最初はすべて○です。</div>
+    <button id="saveBtn">保存する</button>
+  </div>
+</section>
+
+<div id="toast"></div>
+
+<script>
+/* ======================================================================
+   設定：GASウェブアプリのURL（デプロイ後に貼り付け）
+   ====================================================================== */
+var GAS_URL = "https://script.google.com/macros/s/AKfycbwFa0xTp1NE7xUMkCswQLrI4j3FPejgb31qX4wJxvbslha2Xr-0r37KcTTajnJ6iVgc/exec";
+
+/* ======================================================================
+   状態
+   ====================================================================== */
+var STATE = { studentId:"", termId:"", dates:[], slots:[], grid:{} };
+
+/* ======================================================================
+   通信（POST：text/plainでプリフライト回避）
+   ====================================================================== */
+function callApi(payload){
+  return fetch(GAS_URL, { method:"POST", body: JSON.stringify(payload) })
+    .then(function(r){ return r.json(); });
+}
+
+/* ======================================================================
+   ログイン
+   ====================================================================== */
+var sidInput = document.getElementById("sid");
+var loginBtn = document.getElementById("loginBtn");
+var loginMsg = document.getElementById("loginMsg");
+
+// 前回IDを復元（任意）
+try{ var last = localStorage.getItem("akosos_sid"); if(last) sidInput.value = last; }catch(e){}
+
+loginBtn.addEventListener("click", doLogin);
+sidInput.addEventListener("keydown", function(e){ if(e.key==="Enter") doLogin(); });
+
+function doLogin(){
+  var sid = (sidInput.value||"").trim();
+  loginMsg.textContent = ""; loginMsg.classList.remove("err");
+  if(!sid){ showLoginErr("生徒IDを入力してください"); return; }
+  if(GAS_URL.indexOf("PASTE_")===0){ showLoginErr("（設定）GAS_URL が未設定です"); return; }
+
+  loginBtn.disabled = true; loginBtn.textContent = "確認中…";
+  callApi({ action:"login", studentId:sid })
+    .then(function(res){
+      if(!res.ok){ showLoginErr(res.error || "ログインできませんでした"); return; }
+      try{ localStorage.setItem("akosos_sid", sid); }catch(e){}
+      STATE.studentId = res.student.id;
+      enterApp(res);
+    })
+    .catch(function(){ showLoginErr("通信に失敗しました。電波の良い場所で再度お試しください。"); })
+    .finally(function(){ loginBtn.disabled=false; loginBtn.textContent="ログイン"; });
+}
+function showLoginErr(m){ loginMsg.textContent=m; loginMsg.classList.add("err"); }
+
+/* ======================================================================
+   アプリ画面へ
+   ====================================================================== */
+function enterApp(res){
+  document.getElementById("loginView").classList.add("hidden");
+  document.getElementById("appView").classList.remove("hidden");
+  document.getElementById("whoName").textContent  = res.student.name || "—";
+  document.getElementById("whoGrade").textContent = res.student.grade || "—";
+
+  if(!res.term){
+    document.getElementById("termTitle").textContent = "日程希望調査";
+    document.getElementById("legend").classList.add("hidden");
+    document.getElementById("saveBar").classList.add("hidden");
+    document.getElementById("gridArea").innerHTML =
+      '<div class="notice">'+ (res.message || "現在受付中の調査はありません。") +
+      '<br><br><button class="linklike" onclick="logout()">別のIDで入り直す</button></div>';
+    return;
+  }
+
+  STATE.termId = res.term.id;
+  STATE.dates  = res.dates;
+  STATE.slots  = res.term.slots;     // [{slot:'A',time:'12:35'},...]
+  STATE.grid   = res.grid;           // {dateKey:[1,1,1,1,1,1]}
+  document.getElementById("termTitle").textContent = res.term.title || "日程希望調査";
+  renderGrid();
+}
+
+function logout(){
+  STATE = { studentId:"", termId:"", dates:[], slots:[], grid:{} };
+  document.getElementById("appView").classList.add("hidden");
+  document.getElementById("loginView").classList.remove("hidden");
+  document.getElementById("legend").classList.remove("hidden");
+  document.getElementById("saveBar").classList.remove("hidden");
+}
+
+/* ======================================================================
+   グリッド描画（14日ブロックを縦に積む。コマ=行／日付=列）
+   ====================================================================== */
+function renderGrid(){
+  var area = document.getElementById("gridArea");
+  area.innerHTML = "";
+
+  // ブロック番号でグループ化
+  var blocks = {};
+  STATE.dates.forEach(function(d){ (blocks[d.block]=blocks[d.block]||[]).push(d); });
+  var blockNos = Object.keys(blocks).map(Number).sort(function(a,b){return a-b;});
+
+  blockNos.forEach(function(bn){
+    var ds = blocks[bn];
+    var wrap = document.createElement("div"); wrap.className="block";
+
+    var head = document.createElement("div"); head.className="block-head";
+    head.textContent = "第"+bn+"ブロック（"+ds[0].label+"〜"+ds[ds.length-1].label+"）";
+    wrap.appendChild(head);
+
+    var scr = document.createElement("div"); scr.className="scroller";
+    var tbl = document.createElement("table"); tbl.className="grid";
+
+    // ヘッダ（日付）
+    var thead = document.createElement("thead");
+    var hr = document.createElement("tr");
+    var corner = document.createElement("th"); corner.className="corner"; corner.textContent="コマ";
+    hr.appendChild(corner);
+    ds.forEach(function(d){
+      var th = document.createElement("th");
+      if(d.dow==="土") th.className="sat"; if(d.dow==="日") th.className="sun";
+      th.innerHTML = '<div class="d">'+d.label+'</div><div>'+d.dow+'</div>';
+      hr.appendChild(th);
+    });
+    thead.appendChild(hr); tbl.appendChild(thead);
+
+    // 本体（コマ×6行）
+    var tbody = document.createElement("tbody");
+    STATE.slots.forEach(function(sl, si){
+      var tr = document.createElement("tr");
+      var sh = document.createElement("th"); sh.className="slot";
+      sh.innerHTML = '<div class="sn">'+sl.slot+'コマ</div>'+(sl.time? '<div class="st">'+sl.time+'〜</div>':'');
+      tr.appendChild(sh);
+      ds.forEach(function(d){
+        var td = document.createElement("td"); td.className="cell";
+        var val = (STATE.grid[d.key] && STATE.grid[d.key][si]!=null) ? STATE.grid[d.key][si] : 1;
+        var btn = document.createElement("button");
+        applyCell(btn, val);
+        btn.addEventListener("click", (function(key, idx, button){
+          return function(){
+            if(!STATE.grid[key]) STATE.grid[key]=[1,1,1,1,1,1];
+            var nv = STATE.grid[key][idx] ? 0 : 1;
+            STATE.grid[key][idx] = nv;
+            applyCell(button, nv);
+          };
+        })(d.key, si, btn));
+        td.appendChild(btn); tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    tbl.appendChild(tbody);
+    scr.appendChild(tbl); wrap.appendChild(scr); area.appendChild(wrap);
+  });
+}
+
+function applyCell(btn, val){
+  if(val){ btn.className="toggle ok"; btn.textContent="○"; }
+  else   { btn.className="toggle ng"; btn.textContent="×"; }
+}
+
+/* ======================================================================
+   保存
+   ====================================================================== */
+var saveBtn = document.getElementById("saveBtn");
+saveBtn.addEventListener("click", function(){
+  saveBtn.disabled=true; saveBtn.textContent="保存中…";
+  callApi({ action:"save", studentId:STATE.studentId, termId:STATE.termId, grid:STATE.grid })
+    .then(function(res){
+      if(res.ok){ toast("保存しました"); }
+      else{ toast(res.error || "保存に失敗しました"); }
+    })
+    .catch(function(){ toast("通信に失敗しました"); })
+    .finally(function(){ saveBtn.disabled=false; saveBtn.textContent="保存する"; });
+});
+
+var toastTimer;
+function toast(m){
+  var t=document.getElementById("toast"); t.textContent=m; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer=setTimeout(function(){ t.classList.remove("show"); }, 2000);
+}
+</script>
+</body>
+</html>
