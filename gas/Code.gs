@@ -174,8 +174,14 @@ function rowToTerm_(row, idx) {
 
 function slotLabels_(term) {
   return SLOTS.map(function (s) {
-    return { slot: s, time: String(term['time_' + s] || '') };
+    return { slot: s, time: timeStr_(term['time_' + s]) };
   });
+}
+
+// 時刻セルが Date型でも文字列でも "H:mm" に整える
+function timeStr_(v) {
+  if (v instanceof Date) return fmt_(v, 'H:mm');
+  return String(v == null ? '' : v).trim();
 }
 
 // ====== 日付生成（num_blocks × 14日）======
