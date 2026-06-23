@@ -103,8 +103,9 @@ function apiSave_(p) {
   }
 
   var dates = buildDates_(term);
-  writeStudentGrid_(term.term_id, stu, dates, p.grid || {});
-  return { ok: true, saved: dates.length };
+  var changed = writeStudentGrid_(term.term_id, stu, dates, p.grid || {});
+  appendSaveLog_(term.term_id, stu, changed);
+  return { ok: true, saved: dates.length, changed: changed };
 }
 
 // ====== Students 参照 ======
@@ -238,6 +239,7 @@ function writeStudentGrid_(termId, stu, dates, grid) {
     }
   }
 
+  var changed = false;
   var appends = [];
   dates.forEach(function (d) {
     var g = grid[d.key];
@@ -246,16 +248,23 @@ function writeStudentGrid_(termId, stu, dates, grid) {
       : [1, 1, 1, 1, 1, 1];
     if (rowByDate[d.key] !== undefined) {
       var r = rowByDate[d.key];
+      // 変更検知（保存前の値と比較）
+      for (var c = 0; c < 6; c++) {
+        if ((Number(values[r][3 + c]) ? 1 : 0) !== v[c]) { changed = true; break; }
+      }
       values[r][1] = stu.name;
       values[r][3] = v[0]; values[r][4] = v[1]; values[r][5] = v[2];
       values[r][6] = v[3]; values[r][7] = v[4]; values[r][8] = v[5];
     } else {
+      // 行が無い＝初期状態(全○)からの比較。×が1つでもあれば変更あり
+      for (var c2 = 0; c2 < 6; c2++) { if (v[c2] !== 1) { changed = true; break; } }
       appends.push([stu.id, stu.name, d.key, v[0], v[1], v[2], v[3], v[4], v[5]]);
     }
   });
 
   if (values.length) sh.getRange(2, 1, values.length, 9).setValues(values);
   if (appends.length) sh.getRange(sh.getLastRow() + 1, 1, appends.length, 9).setValues(appends);
+  return changed;
 }
 
 // ====== resp_<term> シート用意 ======
@@ -317,6 +326,22 @@ function makeExportNoId_(termId) {
   out.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
   out.setFrozenRows(1);
   return outName;
+}
+
+// ====== 保存ログ（講習別 SaveLog_<term_id> に1行追記）======
+function appendSaveLog_(termId, stu, changed) {
+  var ss = openSurvey_();
+  var name = 'SaveLog_' + termId;
+  var sh = ss.getSheetByName(name);
+  if (!sh) {
+    sh = ss.insertSheet(name);
+    sh.getRange(1, 1, 1, 5)
+      .setValues([['日時', 'term_id', '生徒ID', '生徒名', '変更']])
+      .setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  var now = fmt_(new Date(), 'yyyy/MM/dd HH:mm:ss');
+  sh.appendRow([now, termId, stu.id, stu.name, changed ? 'あり' : 'なし']);
 }
 
 // ====== スプレッドシートメニュー（塾長用）======
